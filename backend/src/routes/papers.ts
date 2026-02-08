@@ -4,6 +4,8 @@ import Paper from '../models/Paper';
 import { PdfService } from '../services/pdfServices';
 import { SummarizerAgent } from '../services/summarizerAgent';
 import { ExplorerAgent } from '../services/explorerAgent';
+import mongoose from 'mongoose';
+import { Types } from 'mongoose';
 
 const router = express.Router();
 
@@ -20,6 +22,105 @@ const explorerAgent = new ExplorerAgent();
 // Helper to prevent Rate Limiting (429)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// router.post('/upload', upload.single('pdf'), async (req: any, res: any) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ error: 'No PDF uploaded' });
+//     }
+
+//     console.log(`📦 Processing file: ${req.file.originalname}`);
+
+//     // 1. Extract Text
+//     const fullText = await pdfService.extractText(req.file.buffer);
+
+//     // 2. Extract Basic Metadata (Regex)
+//     let metadata = pdfService.extractMetadata(fullText);
+
+//     // 2.5 Enhance Metadata with AI (Fixes "Untitled" issue)
+//     try {
+//         console.log("🧠 AI analyzing metadata...");
+//         const aiMetadata = await summarizerAgent.extractMetadataWithAI(fullText);
+        
+//         // Merge AI results (AI is usually smarter about Titles)
+//         if (aiMetadata.title && aiMetadata.title !== "Untitled") {
+//             metadata.title = aiMetadata.title;
+//         }
+//         if (aiMetadata.authors && aiMetadata.authors.length > 0) {
+//             metadata.authors = aiMetadata.authors;
+//         }
+//         if (aiMetadata.year) {
+//             metadata.year = aiMetadata.year;
+//         }
+//         console.log("✅ Metadata enhanced:", metadata.title);
+//     } catch (e) {
+//         console.log("⚠️ AI Metadata failed, keeping regex defaults.");
+//     }
+
+//     // 💤 PAUSE: Wait 2 seconds to respect Gemini Rate Limits
+//     await delay(2000);
+
+//     // 3. Generate Summary
+//     let summary = "Summary unavailable";
+//     try {
+//         summary = await summarizerAgent.summarizePaper(fullText);
+//     } catch (err) {
+//         console.error("AI Summary failed");
+//     }
+
+//     // 💤 PAUSE: Wait 1 second
+//     await delay(1000);
+
+//     // 4. Extract Keywords (Optional - don't fail upload if this fails)
+//     let keywords: string[] = [];
+//     try {
+//         keywords = await summarizerAgent.extractKeywords(fullText);
+//     } catch (err) {
+//         console.warn("Keyword extraction skipped");
+//         keywords = ["Research", "Analysis"];
+//     }
+
+//     // 5. Find Related Papers (Optional)
+//     let relatedPapers: any[] = [];
+//     try {
+//          // Search using the Title
+//          relatedPapers = await explorerAgent.findRelatedPapers(metadata.title);
+//     } catch (err) {
+//         console.warn("Related papers search skipped");
+//     }
+
+//     // 6. Save to DB
+//     const paper = new Paper({
+//       title: metadata.title,
+//       authors: metadata.authors,
+//       abstract: metadata.abstract,
+//       fullText,
+//       summary,
+//       keywords,
+//       relatedPapers,
+//       year: metadata.year,
+//       uploadDate: new Date()
+//     });
+
+//     await paper.save();
+//     console.log('💾 Saved paper to DB:', paper._id);
+
+//     res.json({ success: true, paper });
+
+//   } catch (error: any) {
+//     console.error('❌ Upload error:', error);
+//     res.status(500).json({ error: 'Failed to process PDF', details: error.message });
+//   }
+// });
+
+// router.get('/', async (req, res) => {
+//     try {
+//         const papers = await Paper.find().select('-fullText').sort({ uploadDate: -1 });
+//         res.json({ papers });
+//     } catch (error) {
+//         res.status(500).json({ error: 'Fetch failed' });
+//     }
+// });
+
 router.post('/upload', upload.single('pdf'), async (req: any, res: any) => {
   try {
     if (!req.file) {
@@ -28,95 +129,82 @@ router.post('/upload', upload.single('pdf'), async (req: any, res: any) => {
 
     console.log(`📦 Processing file: ${req.file.originalname}`);
 
-    // 1. Extract Text
+    // Extract text only
     const fullText = await pdfService.extractText(req.file.buffer);
 
-    // 2. Extract Basic Metadata (Regex)
-    let metadata = pdfService.extractMetadata(fullText);
+    // Basic metadata only (regex)
+    const metadata = pdfService.extractMetadata(fullText);
 
-    // 2.5 Enhance Metadata with AI (Fixes "Untitled" issue)
-    try {
-        console.log("🧠 AI analyzing metadata...");
-        const aiMetadata = await summarizerAgent.extractMetadataWithAI(fullText);
-        
-        // Merge AI results (AI is usually smarter about Titles)
-        if (aiMetadata.title && aiMetadata.title !== "Untitled") {
-            metadata.title = aiMetadata.title;
-        }
-        if (aiMetadata.authors && aiMetadata.authors.length > 0) {
-            metadata.authors = aiMetadata.authors;
-        }
-        if (aiMetadata.year) {
-            metadata.year = aiMetadata.year;
-        }
-        console.log("✅ Metadata enhanced:", metadata.title);
-    } catch (e) {
-        console.log("⚠️ AI Metadata failed, keeping regex defaults.");
-    }
-
-    // 💤 PAUSE: Wait 2 seconds to respect Gemini Rate Limits
-    await delay(2000);
-
-    // 3. Generate Summary
-    let summary = "Summary unavailable";
-    try {
-        summary = await summarizerAgent.summarizePaper(fullText);
-    } catch (err) {
-        console.error("AI Summary failed");
-    }
-
-    // 💤 PAUSE: Wait 1 second
-    await delay(1000);
-
-    // 4. Extract Keywords (Optional - don't fail upload if this fails)
-    let keywords: string[] = [];
-    try {
-        keywords = await summarizerAgent.extractKeywords(fullText);
-    } catch (err) {
-        console.warn("Keyword extraction skipped");
-        keywords = ["Research", "Analysis"];
-    }
-
-    // 5. Find Related Papers (Optional)
-    let relatedPapers: any[] = [];
-    try {
-         // Search using the Title
-         relatedPapers = await explorerAgent.findRelatedPapers(metadata.title);
-    } catch (err) {
-        console.warn("Related papers search skipped");
-    }
-
-    // 6. Save to DB
+    // Save immediately
     const paper = new Paper({
-      title: metadata.title,
-      authors: metadata.authors,
-      abstract: metadata.abstract,
+      title: metadata.title || "Untitled",
+      authors: metadata.authors || [],
+      abstract: metadata.abstract || "",
       fullText,
-      summary,
-      keywords,
-      relatedPapers,
+      summary: "Processing...",
+      keywords: [],
+      relatedPapers: [],
       year: metadata.year,
       uploadDate: new Date()
     });
 
     await paper.save();
-    console.log('💾 Saved paper to DB:', paper._id);
 
-    res.json({ success: true, paper });
+    console.log("💾 Saved paper:", paper._id);
+
+    // Respond fast
+    res.json({
+      success: true,
+      paperId: paper._id,
+      message: "Uploaded. Processing in background."
+    });
+
+    // Start AI processing in background (no await)
+    processPaperAI(paper._id, fullText);
 
   } catch (error: any) {
-    console.error('❌ Upload error:', error);
-    res.status(500).json({ error: 'Failed to process PDF', details: error.message });
+    console.error("❌ Upload error:", error);
+    res.status(500).json({ error: "Upload failed", details: error.message });
   }
 });
 
-router.get('/', async (req, res) => {
+
+async function processPaperAI(paperId: Types.ObjectId, fullText: string) {
+  try {
+    console.log("🤖 Background AI started:", paperId);
+
+    const summarizer = new SummarizerAgent();
+    const explorer = new ExplorerAgent();
+
+    // AI Summary
+    const summary = await summarizer.summarizePaper(fullText);
+
+    // Keywords
+    let keywords: string[] = [];
     try {
-        const papers = await Paper.find().select('-fullText').sort({ uploadDate: -1 });
-        res.json({ papers });
-    } catch (error) {
-        res.status(500).json({ error: 'Fetch failed' });
+      keywords = await summarizer.extractKeywords(fullText);
+    } catch {
+      keywords = ["Research"];
     }
-});
+
+    // Related papers
+    let related: any[] = [];
+    try {
+      related = await explorer.findRelatedPapers("");
+    } catch {}
+
+    // Update DB
+    await Paper.findByIdAndUpdate(paperId, {
+      summary,
+      keywords,
+      relatedPapers: related
+    });
+
+    console.log("✅ AI processing done:", paperId);
+
+  } catch (err) {
+    console.error("❌ Background AI failed:", err);
+  }
+}
 
 export default router;
