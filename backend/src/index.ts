@@ -25,14 +25,20 @@ const allowedOrigins = [
   "http://localhost:3000",
 ].filter((origin): origin is string => Boolean(origin));
 
-
-
-// CORS configuration
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }));
+
 
 app.use(express.json({ limit: '50mb' })); // Increased limit for base64/PDFs
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
