@@ -1,14 +1,18 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 export const connectDatabase = async (): Promise<void> => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/research-assistant';
-    
+    const mongoUri = process.env.MONGODB_URI;
+
+    if (!mongoUri) {
+      throw new Error("MONGODB_URI is not defined in environment variables");
+    }
+
     await mongoose.connect(mongoUri);
-    
-    console.log('✅ MongoDB connected');
+
+    console.log("✅ MongoDB Atlas Connected");
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    process.exit(1); // Exit process with failure
+    console.error("❌ MongoDB connection error:", error);
+    process.exit(1);
   }
 };

@@ -53,6 +53,9 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     res.status(500).json({ error: err.message || "Internal Server Error" });
 });
 
+console.log("GEMINI KEY:", process.env.GEMINI_API_KEY);
+
+
 // Start server
 const startServer = async () => {
     try {
