@@ -20,11 +20,18 @@ const limiter = rateLimit({
   max: 100,
 });
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+].filter((origin): origin is string => Boolean(origin));
+
+
+
 // CORS configuration
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }));
 
 app.use(express.json({ limit: '50mb' })); // Increased limit for base64/PDFs
